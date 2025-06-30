@@ -1,6 +1,8 @@
 import scrapy
 from scrapy.http import Response
 
+from books.items import BooksItem
+
 
 class ScrapyBooksSpider(scrapy.Spider):
     name = "scrapy_books"
@@ -17,7 +19,8 @@ class ScrapyBooksSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     def parse_book(self, response: Response):
-        title = response.css("h1::text").get()
+        books_item = BooksItem()
+        books_item["title"] = response.css("h1::text").get()
 
         table = {}
         rows = response.css("table.table-striped tr")
@@ -26,11 +29,11 @@ class ScrapyBooksSpider(scrapy.Spider):
             value = row.css("td::text").get()
             table[key] = value
 
-        price = float(table.get("Price (incl. tax)", "0").replace("£", ""))
-        amount_in_stock = int(
+        books_item["price"] = float(table.get("Price (incl. tax)", "0").replace("£", ""))
+        books_item["amount_in_stock"] = int(
             table.get("Availability", "").split()[-2].replace("(", "")
         )
-        upc = table.get("UPC", "")
+        books_item["upc"] = table.get("UPC", "")
 
         rating_word = response.css("p.star-rating").attrib["class"].split()[-1]
         rating_converter = {
@@ -40,20 +43,10 @@ class ScrapyBooksSpider(scrapy.Spider):
             "Four": 4,
             "Five": 5
         }
-        rating = rating_converter.get(rating_word, 0)
+        books_item["rating"] = rating_converter.get(rating_word, 0)
 
-        category = response.css("ul.breadcrumb li a::text").getall()[-1]
+        books_item["category"] = response.css("ul.breadcrumb li a::text").getall()[-1]
 
-        description = response.css(".product_page>p::text").get()
+        books_item["description"] = response.css(".product_page>p::text").get()
 
-        result_dict = {
-            "title": title,
-            "price": price,
-            "amount_in_stock": amount_in_stock,
-            "category": category,
-            "rating": rating,
-            "description": description,
-            "upc": upc,
-        }
-
-        yield result_dict
+        yield books_item
